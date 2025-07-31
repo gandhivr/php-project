@@ -1,8 +1,8 @@
 <?php
-// add_product.php
-require_once 'database.php';
-require_once 'Product.php';
-require_once 'auth.php';
+// edit_product.php
+include_once 'database.php';
+include_once 'Product.php';
+include_once 'auth.php';
 
 // Check if user is logged in
 requireLogin();
@@ -14,8 +14,25 @@ $product = new Product($db);
 $current_user = getCurrentUser();
 $user_id = $current_user['id'];
 
+// Get product ID
+if (!isset($_GET['id']) || empty($_GET['id'])) {
+    setFlashMessage("Invalid product ID.", "danger");
+    header("Location: products.php");
+    exit();
+}
+
+$product_id = (int)$_GET['id'];
+$product->id = $product_id;
+$product->user_id = $user_id;
+
+// Load product data
+if (!$product->readOne()) {
+    setFlashMessage("Product not found or access denied.", "danger");
+    header("Location: products.php");
+    exit();
+}
+
 $errors = [];
-$success = false;
 
 if ($_POST) {
     $name = sanitizeInput($_POST['name']);
@@ -45,21 +62,20 @@ if ($_POST) {
         $errors[] = "Category is required.";
     }
 
-    // Add product if no errors
+    // Update product if no errors
     if (empty($errors)) {
-        $product->user_id = $user_id;
         $product->name = $name;
         $product->description = $description;
         $product->quantity = $quantity;
         $product->price = $price;
         $product->category = $category;
 
-        if ($product->create()) {
-            setFlashMessage("Product added successfully!", "success");
+        if ($product->update()) {
+            setFlashMessage("Product updated successfully!", "success");
             header("Location: products.php");
             exit();
         } else {
-            $errors[] = "Failed to add product. Please try again.";
+            $errors[] = "Failed to update product. Please try again.";
         }
     }
 }
@@ -75,7 +91,7 @@ $categories = [
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Add Product - Inventory Management System</title>
+    <title>Edit Product - Inventory Management System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -88,13 +104,18 @@ $categories = [
             border-radius: 10px;
             padding: 12px 15px;
         }
-        .btn-add {
+        .btn-update {
             border-radius: 10px;
             padding: 12px 30px;
             font-weight: 600;
         }
         .navbar-brand {
             font-weight: 700;
+        }
+        .product-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
         }
     </style>
 </head>
@@ -121,7 +142,7 @@ $categories = [
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link active" href="add_product.php">
+                        <a class="nav-link" href="add_product.php">
                             <i class="fas fa-plus"></i> Add Product
                         </a>
                     </li>
@@ -146,8 +167,8 @@ $categories = [
         <!-- Page Header -->
         <div class="row mb-4">
             <div class="col-md-8">
-                <h1 class="h3 mb-0">Add New Product</h1>
-                <p class="text-muted">Add a new product to your inventory</p>
+                <h1 class="h3 mb-0">Edit Product</h1>
+                <p class="text-muted">Update product information</p>
             </div>
             <div class="col-md-4 text-end">
                 <a href="products.php" class="btn btn-outline-secondary">
@@ -156,14 +177,49 @@ $categories = [
             </div>
         </div>
 
-        <div class="row justify-content-center">
+        <div class="row">
+            <!-- Product Info Card -->
+            <div class="col-lg-4 mb-4">
+                <div class="card product-info">
+                    <div class="card-body text-center p-4">
+                        <i class="fas fa-cube fa-3x mb-3"></i>
+                        <h5><?php echo htmlspecialchars($product->name); ?></h5>
+                        <p class="mb-3"><?php echo htmlspecialchars($product->category); ?></p>
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <div class="border-end">
+                                    <h6 class="mb-0"><?php echo $product->quantity; ?></h6>
+                                    <small>Stock</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <h6 class="mb-0">$<?php echo number_format($product->price, 2); ?></h6>
+                                <small>Price</small>
+                            </div>
+                        </div>
+                        <hr class="my-3">
+                        <small>
+                            <i class="fas fa-calendar"></i>
+                            Added: <?php echo date('M j, Y', strtotime($product->created_at)); ?>
+                        </small>
+                        <?php if ($product->updated_at != $product->created_at): ?>
+                            <br>
+                            <small>
+                                <i class="fas fa-edit"></i>
+                                Updated: <?php echo date('M j, Y', strtotime($product->updated_at)); ?>
+                            </small>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Edit Form -->
             <div class="col-lg-8">
                 <div class="card form-card">
-                    <div class="card-body p-5">
-                        <div class="text-center mb-4">
-                            <i class="fas fa-plus-circle fa-3x text-primary mb-3"></i>
-                            <h4>Product Information</h4>
-                            <p class="text-muted">Fill in the details for your new product</p>
+                    <div class="card-body p-4">
+                        <div class="mb-4">
+                            <h4><i class="fas fa-edit text-primary"></i> Update Product Information</h4>
+                            <p class="text-muted">Make changes to your product details</p>
                         </div>
 
                         <?php if (!empty($errors)): ?>
@@ -177,14 +233,14 @@ $categories = [
                             </div>
                         <?php endif; ?>
 
-                        <form method="POST" id="addProductForm">
+                        <form method="POST" id="editProductForm">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label for="name" class="form-label">Product Name <span class="text-danger">*</span></label>
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="fas fa-tag"></i></span>
                                         <input type="text" class="form-control" id="name" name="name" 
-                                               value="<?php echo isset($_POST['name']) ? htmlspecialchars($_POST['name']) : ''; ?>" 
+                                               value="<?php echo isset($_POST['name']) ? htmlspecialchars($_POST['name']) : htmlspecialchars($product->name); ?>" 
                                                placeholder="Enter product name" required>
                                     </div>
                                 </div>
@@ -196,12 +252,17 @@ $categories = [
                                         <select class="form-select" id="category" name="category" required>
                                             <option value="">Select a category</option>
                                             <?php foreach ($categories as $cat): ?>
+                                                <?php 
+                                                $selected_category = isset($_POST['category']) ? $_POST['category'] : $product->category;
+                                                ?>
                                                 <option value="<?php echo $cat; ?>" 
-                                                        <?php echo (isset($_POST['category']) && $_POST['category'] == $cat) ? 'selected' : ''; ?>>
+                                                        <?php echo ($selected_category == $cat) ? 'selected' : ''; ?>>
                                                     <?php echo $cat; ?>
                                                 </option>
                                             <?php endforeach; ?>
-                                            <option value="Other">Other</option>
+                                            <option value="Other" <?php echo (!in_array($selected_category, $categories) && !empty($selected_category)) ? 'selected' : ''; ?>>
+                                                Other
+                                            </option>
                                         </select>
                                     </div>
                                 </div>
@@ -212,9 +273,8 @@ $categories = [
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-align-left"></i></span>
                                     <textarea class="form-control" id="description" name="description" rows="4" 
-                                              placeholder="Enter product description" required><?php echo isset($_POST['description']) ? htmlspecialchars($_POST['description']) : ''; ?></textarea>
+                                              placeholder="Enter product description" required><?php echo isset($_POST['description']) ? htmlspecialchars($_POST['description']) : htmlspecialchars($product->description); ?></textarea>
                                 </div>
-                                <div class="form-text">Provide a detailed description of your product</div>
                             </div>
 
                             <div class="row">
@@ -223,10 +283,20 @@ $categories = [
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="fas fa-cubes"></i></span>
                                         <input type="number" class="form-control" id="quantity" name="quantity" 
-                                               value="<?php echo isset($_POST['quantity']) ? (int)$_POST['quantity'] : ''; ?>" 
+                                               value="<?php echo isset($_POST['quantity']) ? (int)$_POST['quantity'] : $product->quantity; ?>" 
                                                min="0" placeholder="0" required>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="adjustQuantity(-1)">
+                                            <i class="fas fa-minus"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="adjustQuantity(1)">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
                                     </div>
-                                    <div class="form-text">Current stock quantity</div>
+                                    <?php if ($product->quantity < 10): ?>
+                                        <div class="form-text text-warning">
+                                            <i class="fas fa-exclamation-triangle"></i> Low stock warning
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
 
                                 <div class="col-md-6 mb-3">
@@ -234,22 +304,27 @@ $categories = [
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="fas fa-dollar-sign"></i></span>
                                         <input type="number" class="form-control" id="price" name="price" 
-                                               value="<?php echo isset($_POST['price']) ? (float)$_POST['price'] : ''; ?>" 
+                                               value="<?php echo isset($_POST['price']) ? (float)$_POST['price'] : $product->price; ?>" 
                                                step="0.01" min="0.01" placeholder="0.00" required>
                                     </div>
-                                    <div class="form-text">Price per unit</div>
                                 </div>
                             </div>
 
                             <div class="row mt-4">
-                                <div class="col-md-6">
-                                    <button type="button" class="btn btn-outline-secondary w-100" onclick="window.history.back()">
+                                <div class="col-md-4">
+                                    <a href="products.php" class="btn btn-outline-secondary w-100">
                                         <i class="fas fa-times"></i> Cancel
+                                    </a>
+                                </div>
+                                <div class="col-md-4">
+                                    <button type="button" class="btn btn-outline-danger w-100" 
+                                            onclick="confirmDelete(<?php echo $product->id; ?>, '<?php echo htmlspecialchars($product->name, ENT_QUOTES); ?>')">
+                                        <i class="fas fa-trash"></i> Delete
                                     </button>
                                 </div>
-                                <div class="col-md-6">
-                                    <button type="submit" class="btn btn-primary btn-add w-100">
-                                        <i class="fas fa-plus"></i> Add Product
+                                <div class="col-md-4">
+                                    <button type="submit" class="btn btn-primary btn-update w-100">
+                                        <i class="fas fa-save"></i> Update Product
                                     </button>
                                 </div>
                             </div>
@@ -258,20 +333,23 @@ $categories = [
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Additional Info Card -->
-        <div class="row mt-4">
-            <div class="col-lg-8 mx-auto">
-                <div class="card bg-light">
-                    <div class="card-body">
-                        <h6><i class="fas fa-info-circle text-info"></i> Tips for Adding Products</h6>
-                        <ul class="mb-0 small">
-                            <li>Use descriptive names that clearly identify your products</li>
-                            <li>Include key details in the description (size, color, model, etc.)</li>
-                            <li>Set accurate quantities to maintain proper inventory tracking</li>
-                            <li>Products with quantity below 10 will be flagged as low stock</li>
-                        </ul>
-                    </div>
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Delete</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete the product "<span id="productName"></span>"?</p>
+                    <p class="text-danger"><strong>This action cannot be undone.</strong></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <a href="#" id="deleteConfirmBtn" class="btn btn-danger">Delete Product</a>
                 </div>
             </div>
         </div>
@@ -279,8 +357,25 @@ $categories = [
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Quantity adjustment functions
+        function adjustQuantity(change) {
+            const quantityInput = document.getElementById('quantity');
+            let currentValue = parseInt(quantityInput.value) || 0;
+            let newValue = currentValue + change;
+            if (newValue >= 0) {
+                quantityInput.value = newValue;
+            }
+        }
+
+        // Delete confirmation
+        function confirmDelete(productId, productName) {
+            document.getElementById('productName').textContent = productName;
+            document.getElementById('deleteConfirmBtn').href = 'products.php?delete=' + productId;
+            new bootstrap.Modal(document.getElementById('deleteModal')).show();
+        }
+
         // Form validation
-        document.getElementById('addProductForm').addEventListener('submit', function(e) {
+        document.getElementById('editProductForm').addEventListener('submit', function(e) {
             const name = document.getElementById('name').value.trim();
             const description = document.getElementById('description').value.trim();
             const quantity = parseInt(document.getElementById('quantity').value);
@@ -301,7 +396,7 @@ $categories = [
             }
         });
 
-        // Custom category input
+        // Custom category handling
         document.getElementById('category').addEventListener('change', function() {
             if (this.value === 'Other') {
                 const customCategory = prompt('Enter custom category:');
@@ -309,10 +404,17 @@ $categories = [
                     const option = new Option(customCategory.trim(), customCategory.trim(), true, true);
                     this.add(option, this.options[this.options.length - 1]);
                 } else {
-                    this.value = '';
+                    this.value = '<?php echo htmlspecialchars($product->category); ?>';
                 }
             }
         });
+
+        // Add existing category if not in predefined list
+        <?php if (!in_array($product->category, $categories) && !empty($product->category)): ?>
+        const categorySelect = document.getElementById('category');
+        const customOption = new Option('<?php echo htmlspecialchars($product->category); ?>', '<?php echo htmlspecialchars($product->category); ?>', true, true);
+        categorySelect.add(customOption, categorySelect.options[categorySelect.options.length - 1]);
+        <?php endif; ?>
     </script>
 </body>
 </html>

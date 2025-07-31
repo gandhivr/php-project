@@ -1,0 +1,150 @@
+<?php include 'config.php'; ?>
+<form method="POST">
+    <input type="text" name="username" required placeholder="Username"><br><br>
+    <input type="password" name="password" required placeholder="Password"><br><br>
+    <input type="password" name="confirm_password" required placeholder="Confirm Password"><br><br>
+    <button name="register">Register</button>
+</form>
+
+<?php
+if (isset($_POST['register'])) {
+    $user = $_POST['username'];
+    $pass = $_POST['password'];
+    $confirm_pass = $_POST['confirm_password'];
+
+    if ($pass !== $confirm_pass) {
+        echo "<p style='color:red;'>Passwords do not match!</p>";
+    } else {
+        $hashed_pass = password_hash($pass, PASSWORD_DEFAULT);
+        $check = $conn->query("SELECT * FROM users WHERE username='$user'");
+
+        if ($check->num_rows > 0) {
+            echo "<p style='color:red;'>Username already exists!</p>";
+        } else {
+            $conn->query("INSERT INTO users (username, password) VALUES ('$user', '$hashed_pass')");
+            echo "<p style='color:green;'>Registered successfully! <a href='login.php'>Login here</a>.</p>";
+        }
+    }
+}
+?>
+CREATE DATABASE sales_db;
+USE sales_db;
+
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(100) NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    password VARCHAR(255) NOT NULL
+);
+
+CREATE TABLE products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100),
+    price DECIMAL(10,2)
+);
+
+CREATE TABLE sales (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id INT,
+    quantity INT,
+    sale_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id)
+);
+
+
+<?php
+$conn = new mysqli("localhost", "root", "", "sales_db");
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+session_start();
+?>
+
+
+<?php include 'config.php'; ?>
+<form method="POST">
+    <input type="text" name="username" required placeholder="Username">
+    <input type="password" name="password" required placeholder="Password">
+    <button name="login">Login</button>
+</form>
+
+<?php
+if (isset($_POST['login'])) {
+    $user = $_POST['username'];
+    $pass = $_POST['password'];
+
+    $res = $conn->query("SELECT * FROM users WHERE username='$user'");
+    if ($res->num_rows > 0) {
+        $row = $res->fetch_assoc();
+        if (password_verify($pass, $row['password'])) {
+            $_SESSION['user'] = $user;
+            header("Location: dashboard.php");
+        } else {
+            echo "Wrong password!";
+        }
+    } else {
+        echo "User not found!";
+    }
+}
+?>
+
+<?php include 'config.php'; if (!isset($_SESSION['user'])) header("Location: login.php"); ?>
+<h2>Welcome, <?= $_SESSION['user'] ?></h2>
+<a href="add_product.php">Add Product</a> |
+<a href="add_sale.php">Add Sale</a> |
+<a href="view_sales.php">View Sales</a> |
+<a href="logout.php">Logout</a>
+
+<?php include 'config.php'; if (!isset($_SESSION['user'])) header("Location: login.php"); ?>
+<form method="POST">
+    <input type="text" name="name" placeholder="Product Name" required>
+    <input type="number" name="price" placeholder="Price" required step="0.01">
+    <button name="add">Add Product</button>
+</form>
+
+<?php
+if (isset($_POST['add'])) {
+    $n = $_POST['name'];
+    $p = $_POST['price'];
+    $conn->query("INSERT INTO products (name, price) VALUES ('$n', '$p')");
+    echo "Product added!";
+}
+?>
+
+<?php include 'config.php'; if (!isset($_SESSION['user'])) header("Location: login.php"); ?>
+<form method="POST">
+    <select name="product_id" required>
+        <option value="">Select Product</option>
+        <?php
+        $res = $conn->query("SELECT * FROM products");
+        while ($r = $res->fetch_assoc()) {
+            echo "<option value='{$r['id']}'>{$r['name']}</option>";
+        }
+        ?>
+    </select>
+    <input type="number" name="qty" placeholder="Quantity" required>
+    <button name="sale">Record Sale</button>
+</form>
+
+<?php
+if (isset($_POST['sale'])) {
+    $pid = $_POST['product_id'];
+    $qty = $_POST['qty'];
+    $conn->query("INSERT INTO sales (product_id, quantity) VALUES ($pid, $qty)");
+    echo "Sale recorded!";
+}
+?>
+
+<?php include 'config.php'; if (!isset($_SESSION['user'])) header("Location: login.php"); ?>
+<h3>Sales List</h3>
+<table border="1">
+    <tr><th>Product</th><th>Quantity</th><th>Date</th></tr>
+    <?php
+    $res = $conn->query("SELECT sales.*, products.name FROM sales JOIN products ON sales.product_id = products.id");
+    while ($row = $res->fetch_assoc()) {
+        echo "<tr><td>{$row['name']}</td><td>{$row['quantity']}</td><td>{$row['sale_date']}</td></tr>";
+    }
+    ?>
+</table>
+
+<?php session_start(); session_destroy(); header("Location: login.php"); ?>
