@@ -1,25 +1,29 @@
 <?php
 // dashboard.php
-require_once 'database.php';
-require_once 'Product.php';
-require_once 'auth.php';
 
-// Check if user is logged in
-requireLogin();
+// 1. Import dependencies
+include_once 'database.php';      // For database connection
+include_once 'Product.php';       // For the Product class (handles products logic)
+include_once 'auth.php';          // For authentication functions
 
+// 2. Make sure the user is logged in, otherwise redirect to login
+requireLogin();                   // Checks if user is logged in; if not, redirects
+
+// 3. Connect to the database and create Product object
 $database = new Database();
 $db = $database->getConnection();
-$product = new Product($db);
+$product = new Product($db);      // Product object will run queries for us
 
-$current_user = getCurrentUser();
-$user_id = $current_user['id'];
+// 4. Get info about the current logged-in user
+$current_user = getCurrentUser(); // Array with current user's info
+$user_id = $current_user['id'];   // User's unique ID (used for queries)
 
-// Get statistics
-$total_products = $product->getTotalCount($user_id);
-$low_stock_count = $product->getLowStockCount($user_id);
-$low_stock_products = $product->getLowStockProducts($user_id);
+// 5. Dashboard statistics (get these numbers to show as cards)
+$total_products = $product->getTotalCount($user_id);        // How many products user owns
+$low_stock_count = $product->getLowStockCount($user_id);    // How many are 'low stock'
+$low_stock_products = $product->getLowStockProducts($user_id); // Which products are low stock (for alert table)
 
-// Check for flash messages
+// 6. Show any flash messages (e.g., "Product added successfully!")
 $flash = getFlashMessage();
 ?>
 <!DOCTYPE html>
