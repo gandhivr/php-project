@@ -42,7 +42,7 @@ $error = '';
 // Process form submission for updates
 if ($_POST) {
     // Get and sanitize updated data
-      //Removes unwanted spaces
+      // Sanitize Function Removes unwanted spaces
     $name = sanitizeInput($_POST['name']);
     $category = sanitizeInput($_POST['category']);
     $price = floatval($_POST['price']);
