@@ -1,81 +1,75 @@
 <?php
 // register.php
-require_once 'database.php';
-require_once 'User.php';
-require_once 'auth.php';
+// register.php - User registration page
+include_once 'database.php';
+include_once 'User.php';
+include_once 'auth.php';
+// Include required files for database, user class, and authentication
 
-// Redirect if already logged in
+// Include required files for database, user class, and authentication
+
+
+// If user is already logged in, redirect to dashboard
 redirectIfLoggedIn();
 
+// Create database connection and user object
 $database = new Database();
 $db = $database->getConnection();
 $user = new User($db);
 
-$errors = [];
-$success = false;
+// Initialize variables for form handling
+$error = '';
+$success = '';
 
+// Check if form was submitted (POST request)
 if ($_POST) {
-    $full_name = sanitizeInput($_POST['full_name']);
+    // Get and sanitize user input from the form
     $username = sanitizeInput($_POST['username']);
     $email = sanitizeInput($_POST['email']);
+    $full_name = sanitizeInput($_POST['full_name']);
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
 
-    // Validation
-    if (empty($full_name)) {
-        $errors[] = "Full name is required.";
+    // Validate all required fields are filled
+    if (empty($username) || empty($email) || empty($full_name) || empty($password)) {
+        $error = "Please fill in all fields.";
     }
-
-    if (empty($username)) {
-        $errors[] = "Username is required.";
-    } elseif (strlen($username) < 3) {
-        $errors[] = "Username must be at least 3 characters long.";
+    // Check if passwords match
+    elseif ($password !== $confirm_password) {
+        $error = "Passwords do not match.";
     }
-
-    if (empty($email)) {
-        $errors[] = "Email is required.";
-    } elseif (!isValidEmail($email)) {
-        $errors[] = "Please enter a valid email address.";
+    // Check password length (minimum security)
+    elseif (strlen($password) < 6) {
+        $error = "Password must be at least 6 characters long.";
     }
-
-    if (empty($password)) {
-        $errors[] = "Password is required.";
-    } elseif (strlen($password) < 6) {
-        $errors[] = "Password must be at least 6 characters long.";
-    }
-
-    if ($password !== $confirm_password) {
-        $errors[] = "Passwords do not match.";
-    }
-
-    // Check if username already exists
-    if (empty($errors)) {
+    else {
+        // Set user properties for checking duplicates
         $user->username = $username;
+        $user->email = $email;
+
+        // Check if username already exists in database
         if ($user->usernameExists()) {
-            $errors[] = "Username already exists.";
+            $error = "Username already exists. Please choose another.";
         }
-    }
-
-    // Check if email already exists
-    if (empty($errors)) {
-        $user->email = $email;
-        if ($user->emailExists()) {
-            $errors[] = "Email already exists.";
+        // Check if email already exists in database
+        elseif ($user->emailExists()) {
+            $error = "Email already registered. Please use another email.";
         }
-    }
+        else {
+            // All validations passed - set user data and register
+            $user->full_name = $full_name;
+            $user->password = $password;
 
-    // Register user if no errors
-    if (empty($errors)) {
-        $user->full_name = $full_name;
-        $user->username = $username;
-        $user->email = $email;
-        $user->password = $password;
-
-        if ($user->register()) {
-            $success = true;
-            setFlashMessage("Registration successful! Please login.", "success");
-        } else {
-            $errors[] = "Registration failed. Please try again.";
+            // Attempt to register the user
+            if ($user->register()) {
+                // Registration successful - set success message and redirect
+                setFlashMessage("Registration successful! Please login.", "success");
+                header("Location: login.php");
+                exit();
+            } else {
+                // Registration failed - database error
+                $error = "Registration failed. Please try again.";
+            }
         }
     }
 }
