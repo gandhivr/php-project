@@ -1,9 +1,17 @@
 <?php
+// index.php - Homepage/landing page
 
+// Include authentication to check login status
 require_once 'auth.php';
 
-// Redirect to dashboard if already logged in
-redirectIfLoggedIn();
+// If user is already logged in, redirect to dashboard
+if (isLoggedIn()) {
+    header("Location: dashboard.php");
+    exit();
+}
+
+// Get any flash messages
+$flash = getFlashMessage();
 ?>
 <!DOCTYPE html>
 <html lang="en">
