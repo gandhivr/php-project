@@ -1,9 +1,9 @@
 <?php
 // login.php
-//include_once 'database.php';
+include_once 'database.php';
 include_once 'User.php';
 include_once 'auth.php';
-include_once 'database.php';
+
 // Redirect if already logged in
 redirectIfLoggedIn();
 
@@ -14,6 +14,9 @@ $user = new User($db);
 $error = '';
 
 if ($_POST) {
+    $username = sanitizeInput($_POST['username']);
+    $password = $_POST['password'];
+
     if (empty($username) || empty($password)) {
         $error = "Please enter both username/email and password.";
     } else {
