@@ -1,7 +1,4 @@
 <?php
-// add_product.php
-
-// Error Reporting (for development)
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
@@ -16,27 +13,36 @@ $user_id = $_SESSION['user_id'];
 
 $error = '';
 $success = '';
+$name = $category = $description = $product_code = '';
+$unit_price = $quantity = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Get form values
     $name = trim($_POST['name'] ?? '');
     $description = trim($_POST['description'] ?? '');
     $unit_price = floatval($_POST['unit_price'] ?? 0);
     $quantity = intval($_POST['quantity'] ?? 0);
     $category = trim($_POST['category'] ?? '');
+    $product_code = trim($_POST['product_code'] ?? '');
 
     // Basic validation
     if (
         $name === '' ||
         $unit_price <= 0 ||
         $quantity < 0 ||
-        $category === ''
+        $category === '' ||
+        $product_code === '' ||
+        !isset($_FILES['image']) || $_FILES['image']['error'] !== 0
     ) {
         $error = 'Please fill all required fields with valid values.';
     } else {
-        // Image upload handling
-        $target_file = null;
-        if (isset($_FILES['image']) && $_FILES['image']['error'] == 0) {
+        // Check for duplicate product code
+        $db = (new Database())->getConnection();
+        $checkStmt = $db->prepare("SELECT COUNT(*) FROM products WHERE product_code = ?");
+        $checkStmt->execute([$product_code]);
+        if ($checkStmt->fetchColumn() > 0) {
+            $error = "Product code already exists! Please use another.";
+        } else {
+            // Image upload handling
             $target_dir = "uploads/";
             if (!is_dir($target_dir)) {
                 mkdir($target_dir, 0755, true);
@@ -47,37 +53,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (in_array($imageFileType, $allowed_types)) {
                 $newFileName = uniqid('prod_', true) . '.' . $imageFileType;
                 $target_file = $target_dir . $newFileName;
-
                 if (!move_uploaded_file($_FILES['image']['tmp_name'], $target_file)) {
                     $error = 'Failed to upload the image file.';
                 }
             } else {
                 $error = 'Invalid image file type. Allowed types: jpg, jpeg, png, gif.';
             }
-        }
 
-        // Insert into DB if no errors
-        if (!$error) {
-            $db = (new Database())->getConnection();
-            $stmt = $db->prepare(
-                "INSERT INTO products (user_id, name, description, unit_price, quantity, category, image)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)"
-            );
-            $result = $stmt->execute([
-                $user_id, $name, $description, $unit_price, $quantity, $category, $target_file
-            ]);
+            // Insert into DB if no errors
+            if (!$error) {
+                $stmt = $db->prepare(
+                    "INSERT INTO products (user_id, name, description, unit_price, quantity, category, image, product_code)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+                );
+                $result = $stmt->execute([
+                    $user_id, $name, $description, $unit_price, $quantity, $category, $target_file, $product_code
+                ]);
 
-            if ($result) {
-                $success = 'Product added successfully!';
-                $name = $description = $category = '';
-                $unit_price = $quantity = '';
-            } else {
-                $error = 'Database insert error. Please try again.';
+                if ($result) {
+                    $success = 'Product added successfully!';
+                    $name = $description = $category = $product_code = '';
+                    $unit_price = $quantity = '';
+                } else {
+                    $error = 'Database insert error. Please try again.';
+                }
             }
         }
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -124,11 +129,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <label>Description:</label>
         <textarea name="description" rows="3"><?php echo htmlspecialchars($description ?? ''); ?></textarea>
 
+        <label>Product Code:</label>
+        <input type="text" name="product_code" value="<?php echo htmlspecialchars($product_code ?? ''); ?>" required>
+
         <label>Product Image:</label>
         <input type="file" name="image" accept="image/*" required>
 
         <button type="submit">Add Product</button>
     </form>
+    <br>
+    <a href="products.php">View Products</a>
 </div>
 </body>
 </html>
