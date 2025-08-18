@@ -1,28 +1,23 @@
 <?php
 // products.php - Display and manage all products for logged-in user
 
-// Include required files
 require_once 'database.php';
 require_once 'Product.php';
 require_once 'auth.php';
 
-// Ensure user is logged in
 requireLogin();
 
-// Setup database connection and product object
 $database = new Database();
 $db = $database->getConnection();
 $product = new Product($db);
 
-// Get current user information
 $current_user = getCurrentUser();
 $user_id = $current_user['id'];
 
 // Handle product deletion
 if (isset($_GET['delete'])) {
     $product_id = (int)$_GET['delete'];
-    
-    // Delete the product using the delete method
+
     if ($product->delete($product_id, $user_id)) {
         setFlashMessage("Product deleted successfully!", "success");
     } else {
@@ -32,55 +27,39 @@ if (isset($_GET['delete'])) {
     exit();
 }
 
-// Get search parameters from URL/form
 $search = isset($_GET['search']) ? sanitizeInput($_GET['search']) : '';
 $category_filter = isset($_GET['category']) ? sanitizeInput($_GET['category']) : '';
 $filter = isset($_GET['filter']) ? $_GET['filter'] : '';
 
-// Define page title based on current view
 if ($filter === 'low_stock') {
-    $page_title = "Low Stock Products";
-} elseif (!empty($search)) {
-    $page_title = "Search Results for: " . htmlspecialchars($search);
-} elseif (!empty($category_filter)) {
-    $page_title = "Products in: " . htmlspecialchars($category_filter);
-} else {
-    $page_title = "All Products";
-}
-
-// Get products based on filters and search terms
-if ($filter === 'low_stock') {
-    // Show only low stock products
     $stmt = $product->getLowStockProducts($user_id);
 } else {
-    // Show all products with optional search/category filter
     $stmt = $product->getAllWithFilters($user_id, $search, $category_filter);
 }
 
-// Get all categories for filter dropdown (if you want to add category filtering later)
 $categories = $product->getAllCategories($user_id);
-
-// Check for flash messages
 $flash = getFlashMessage();
+
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $page_title; ?> - Inventory Management System</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <meta charset="UTF-8" />
+    <title><?php echo htmlspecialchars($page_title ?? "Products"); ?> - Inventory Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
     <style>
+        /* Your CSS styles (same as provided) */
         .product-card {
             border: none;
             border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             transition: transform 0.3s ease;
         }
         .product-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
         .low-stock {
             border-left: 4px solid #dc3545;
@@ -94,225 +73,146 @@ $flash = getFlashMessage();
     </style>
 </head>
 <body class="bg-light">
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container">
-            <a class="navbar-brand" href="dashboard.php">
-                <i class="fas fa-boxes"></i> Inventory Manager
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="dashboard.php">
-                            <i class="fas fa-tachometer-alt"></i> Dashboard
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="products.php">
-                            <i class="fas fa-cube"></i> Products
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="add_product.php">
-                            <i class="fas fa-plus"></i> Add Product
-                        </a>
-                    </li>
-                </ul>
-                <ul class="navbar-nav">
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-user"></i> <?php echo htmlspecialchars($current_user['full_name']); ?>
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="logout.php">
-                                <i class="fas fa-sign-out-alt"></i> Logout
-                            </a></li>
-                        </ul>
-                    </li>
-                </ul>
-            </div>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container">
+        <a class="navbar-brand" href="dashboard.php">
+            <i class="fas fa-boxes"></i> Inventory Manager
+        </a>
+        <div id="navbarNav" class="collapse navbar-collapse">
+            <!-- navigation links -->
         </div>
-    </nav>
+    </div>
+</nav>
 
-    <div class="container mt-4">
-        <!-- Page Header -->
-        <div class="row mb-4">
-            <div class="col-md-8">
-                <h1 class="h3 mb-0"><?php echo $page_title; ?></h1>
-                <p class="text-muted">Manage your inventory products</p>
-            </div>
-            <div class="col-md-4 text-end">
-                <a href="add_product.php" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> Add New Product
-                </a>
-            </div>
+<div class="container mt-4">
+    <?php if ($flash): ?>
+        <div class="alert alert-<?php echo htmlspecialchars($flash['type']); ?> alert-dismissible fade show" role="alert">
+            <?php echo htmlspecialchars($flash['message']); ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
+    <?php endif; ?>
 
-        <!-- Flash Messages -->
-        <?php if ($flash): ?>
-            <div class="alert alert-<?php echo $flash['type']; ?> alert-dismissible fade show" role="alert">
-                <?php echo $flash['message']; ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        <?php endif; ?>
-
-        <!-- Search and Filter Section -->
-        <div class="row mb-4">
-            <div class="col-md-8">
-                <!-- Filter Buttons -->
-                <div class="btn-group" role="group">
-                    <a href="products.php" class="btn <?php echo $filter == '' ? 'btn-primary' : 'btn-outline-primary'; ?>">
-                        <i class="fas fa-list"></i> All Products
-                    </a>
-                    <a href="products.php?filter=low_stock" class="btn <?php echo $filter == 'low_stock' ? 'btn-warning' : 'btn-outline-warning'; ?>">
-                        <i class="fas fa-exclamation-triangle"></i> Low Stock
-                    </a>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <!-- Search Form -->
-                <form method="GET" class="d-flex">
-                    <input type="text" name="search" class="form-control me-2" placeholder="Search products..." 
-                           value="<?php echo htmlspecialchars($search); ?>">
-                    <?php if ($filter): ?>
-                        <input type="hidden" name="filter" value="<?php echo htmlspecialchars($filter); ?>">
-                    <?php endif; ?>
-                    <button type="submit" class="btn btn-outline-secondary">
-                        <i class="fas fa-search"></i>
-                    </button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Products Grid -->
-        <div class="row">
-            <?php
-            $product_count = 0;
-            if ($stmt):
-                while ($row = $stmt->fetch(PDO::FETCH_ASSOC)):
-                    $product_count++;
-                    $stock_class = $row['quantity'] <= 5 ? 'low-stock' : 'normal-stock';
-            ?>
+    <div class="row">
+        <?php 
+        $product_count = 0;
+        if ($stmt):
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)):
+                $product_count++;
+                $stock_class = ($row['quantity'] ?? 0) <= 5 ? 'low-stock' : 'normal-stock';
+                $price = isset($row['price']) ? $row['price'] : ($row['unit_price'] ?? 0);
+                $created_at = $row['created_at'] ?? null;
+                ?>
                 <div class="col-lg-4 col-md-6 mb-4">
                     <div class="card product-card <?php echo $stock_class; ?>">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start mb-3">
-                                <h5 class="card-title mb-0"><?php echo htmlspecialchars($row['name']); ?></h5>
-                                <span class="badge bg-secondary"><?php echo htmlspecialchars($row['category']); ?></span>
+                                <h5 class="card-title mb-0"><?php echo htmlspecialchars($row['name'] ?? ''); ?></h5>
+                                <span class="badge bg-secondary"><?php echo htmlspecialchars($row['category'] ?? ''); ?></span>
                             </div>
-                            
+
                             <?php if (!empty($row['description'])): ?>
-                            <p class="card-text text-muted mb-3">
-                                <?php echo htmlspecialchars(substr($row['description'], 0, 100)); ?>
-                                <?php if (strlen($row['description']) > 100) echo '...'; ?>
-                            </p>
+                                <p class="card-text text-muted mb-3">
+                                    <?php 
+                                    $desc = htmlspecialchars($row['description']);
+                                    echo (strlen($desc) > 100) ? substr($desc,0,100) . '...' : $desc;
+                                    ?>
+                                </p>
                             <?php endif; ?>
-                            
+
                             <div class="row mb-3">
                                 <div class="col-6">
                                     <small class="text-muted">Quantity</small>
                                     <div class="fw-bold">
-                                        <span class="badge <?php echo $row['quantity'] <= 5 ? 'bg-danger' : 'bg-success'; ?>">
-                                            <?php echo $row['quantity']; ?>
+                                        <span class="badge <?php echo ($row['quantity'] ?? 0) <= 5 ? 'bg-danger' : 'bg-success'; ?>">
+                                            <?php echo (int)($row['quantity'] ?? 0); ?>
                                         </span>
                                     </div>
                                 </div>
                                 <div class="col-6">
                                     <small class="text-muted">Price</small>
-                                    <div class="fw-bold text-primary">$<?php echo number_format($row['price'], 2); ?></div>
+                                    <div class="fw-bold text-primary">$<?php echo number_format(floatval($price), 2); ?></div>
                                 </div>
                             </div>
-                            
+
                             <div class="d-flex gap-2">
                                 <a href="edit_product.php?id=<?php echo $row['id']; ?>" class="btn btn-sm btn-outline-primary flex-fill">
                                     <i class="fas fa-edit"></i> Edit
                                 </a>
-                                <button type="button" class="btn btn-sm btn-outline-danger" 
-                                        onclick="confirmDelete(<?php echo $row['id']; ?>, '<?php echo htmlspecialchars($row['name'], ENT_QUOTES); ?>')">
+                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                    onclick="confirmDelete(<?php echo $row['id']; ?>, '<?php echo htmlspecialchars($row['name'], ENT_QUOTES); ?>')">
                                     <i class="fas fa-trash"></i> Delete
                                 </button>
                             </div>
-                            
-                            <div class="mt-2">
-                                <small class="text-muted">
-                                    <i class="fas fa-calendar"></i> Added: <?php echo date('M j, Y', strtotime($row['created_at'])); ?>
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            <?php 
-                endwhile;
-            endif;
-            ?>
-        </div>
 
-        <!-- No Products Message -->
-        <?php if ($product_count == 0): ?>
-            <div class="row">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-body text-center py-5">
-                            <i class="fas fa-cube fa-3x text-muted mb-3"></i>
-                            <h4>No products found</h4>
-                            <p class="text-muted mb-4">
-                                <?php if ($filter == 'low_stock'): ?>
-                                    You don't have any products with low stock. Great job maintaining your inventory!
-                                <?php elseif (!empty($search)): ?>
-                                    No products found matching "<?php echo htmlspecialchars($search); ?>". Try a different search term.
-                                <?php else: ?>
-                                    You haven't added any products yet. Start by adding your first product.
-                                <?php endif; ?>
-                            </p>
-                            <?php if (empty($search)): ?>
-                                <a href="add_product.php" class="btn btn-primary">
-                                    <i class="fas fa-plus"></i> Add Your First Product
-                                </a>
-                            <?php else: ?>
-                                <a href="products.php" class="btn btn-secondary me-2">
-                                    <i class="fas fa-list"></i> View All Products
-                                </a>
-                                <a href="add_product.php" class="btn btn-primary">
-                                    <i class="fas fa-plus"></i> Add Product
-                                </a>
+                            <?php if ($created_at): ?>
+                                <div class="mt-2">
+                                    <small class="text-muted">
+                                        <i class="fas fa-calendar"></i> Added: <?php echo date('M j, Y', strtotime($created_at)); ?>
+                                    </small>
+                                </div>
                             <?php endif; ?>
                         </div>
                     </div>
                 </div>
+            <?php
+            endwhile;
+        endif;
+        ?>
+
+        <?php if ($product_count === 0): ?>
+            <div class="col-12">
+                <div class="card text-center p-5">
+                    <i class="fas fa-cube fa-3x text-muted mb-3"></i>
+                    <h4>No products found</h4>
+                    <p class="text-muted mb-4">
+                        <?php
+                            if ($filter == 'low_stock') {
+                                echo "You don't have any low stock products yet.";
+                            } elseif (!empty($search)) {
+                                echo "No products found matching \"" . htmlspecialchars($search) . "\".";
+                            } else {
+                                echo "You haven't added any products yet.";
+                            }
+                        ?>
+                    </p>
+                    <a href="add_product.php" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Add Product
+                    </a>
+                </div>
             </div>
         <?php endif; ?>
     </div>
+</div>
 
-    <!-- Delete Confirmation Modal -->
-    <div class="modal fade" id="deleteModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Confirm Delete</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Are you sure you want to delete the product "<span id="productName"></span>"?</p>
-                    <p class="text-danger"><strong>This action cannot be undone.</strong></p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <a href="#" id="deleteConfirmBtn" class="btn btn-danger">Delete Product</a>
-                </div>
-            </div>
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+<div class="modal-dialog">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title">Confirm Delete</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to delete the product "<span id="productName"></span>"?</p>
+            <p class="text-danger"><strong>This action cannot be undone.</strong></p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <a href="#" id="deleteConfirmBtn" class="btn btn-danger">Delete Product</a>
         </div>
     </div>
+</div>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        function confirmDelete(productId, productName) {
-            document.getElementById('productName').textContent = productName;
-            document.getElementById('deleteConfirmBtn').href = 'products.php?delete=' + productId;
-            new bootstrap.Modal(document.getElementById('deleteModal')).show();
-        }
-    </script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function confirmDelete(productId, productName) {
+    document.getElementById('productName').textContent = productName;
+    document.getElementById('deleteConfirmBtn').href = 'products.php?delete=' + productId;
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+</script>
+
 </body>
 </html>
