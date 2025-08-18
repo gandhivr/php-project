@@ -13,21 +13,38 @@ $user = new User($db);
 
 $error = '';
 
+// Check if form data was submitted via POST method
 if ($_POST) {
+    
+    // Sanitize the username input to prevent XSS attacks and clean the data
     $username = sanitizeInput($_POST['username']);
+    
+    // Get the password directly from POST data (typically hashed later)
     $password = $_POST['password'];
 
+    // Validate that both username and password fields are not empty
     if (empty($username) || empty($password)) {
+        // Set error message if either field is missing
         $error = "Please enter both username/email and password.";
     } else {
-        $user->username = $username;
-        $user->password = $password;
+        // If validation passes, set the user object properties
+        $user->username = $username;  // Assign sanitized username to user object
+        $user->password = $password;  // Assign password to user object
 
+        // Attempt to authenticate the user using the login method
         if ($user->login()) {
+            // If login is successful:
+            // Create a user session with user details
+            // This function likely sets session variables for logged-in state
             loginUser($user->id, $user->username, $user->full_name, $user->email);
+            
+            // Redirect user to dashboard page after successful login
             header("Location: dashboard.php");
+            
+            // Stop script execution to ensure redirect happens
             exit();
         } else {
+            // If login fails, set error message for invalid credentials
             $error = "Invalid username/email or password.";
         }
     }
