@@ -1,156 +1,204 @@
 <?php
-// classes/Product.php
+// File: Product.php
+// Class to manage product-related database operations in inventory system.
+
 class Product {
-    private $conn;
+    private $conn;             // PDO database connection
     private $table_name = "products";
 
+    // Product properties for holding data
     public $id;
     public $user_id;
     public $name;
-    public $description;
-    public $quantity;
-    public $price;
     public $category;
+    public $price;             // corresponds to 'unit_price' column in the DB
+    public $quantity;
+    public $description;
+    public $image;             // path to image file
     public $created_at;
-    public $updated_at;
 
+    /**
+     * Constructor accepts a PDO database connection.
+     *
+     * @param PDO $db PDO database connection.
+     */
     public function __construct($db) {
         $this->conn = $db;
     }
 
-    // Create product
+    /**
+     * Create a new product record in the database.
+     *
+     * @return bool True on success, false on failure.
+     */
     public function create() {
         $query = "INSERT INTO " . $this->table_name . " 
-                  (user_id, name, description, quantity, price, category) 
-                  VALUES (:user_id, :name, :description, :quantity, :price, :category)";
-        
+                  (user_id, name, category, unit_price, quantity, description, image) 
+                  VALUES (:user_id, :name, :category, :unit_price, :quantity, :description, :image)";
+
         $stmt = $this->conn->prepare($query);
-        
+
+        // Bind parameters securely to prepared statement
         $stmt->bindParam(":user_id", $this->user_id);
         $stmt->bindParam(":name", $this->name);
-        $stmt->bindParam(":description", $this->description);
-        $stmt->bindParam(":quantity", $this->quantity);
-        $stmt->bindParam(":price", $this->price);
         $stmt->bindParam(":category", $this->category);
-        
-        if($stmt->execute()) {
-            return true;
-        }
-        return false;
+        $stmt->bindParam(":unit_price", $this->price);
+        $stmt->bindParam(":quantity", $this->quantity);
+        $stmt->bindParam(":description", $this->description);
+        $stmt->bindParam(":image", $this->image);
+
+        return $stmt->execute();
     }
 
-    // Read all products for a user
-    public function readAll($user_id) {
-        $query = "SELECT * FROM " . $this->table_name . " 
-                  WHERE user_id = :user_id 
-                  ORDER BY created_at DESC";
-        
+    /**
+     * Update an existing product including image path.
+     *
+     * @return bool True on success, false on failure.
+     */
+    public function updateWithImage() {
+        $query = "UPDATE " . $this->table_name . " 
+                  SET name = :name, category = :category, unit_price = :unit_price, 
+                      quantity = :quantity, description = :description, image = :image 
+                  WHERE id = :id AND user_id = :user_id";
+
+        $stmt = $this->conn->prepare($query);
+
+        $stmt->bindParam(":name", $this->name);
+        $stmt->bindParam(":category", $this->category);
+        $stmt->bindParam(":unit_price", $this->price);
+        $stmt->bindParam(":quantity", $this->quantity);
+        $stmt->bindParam(":description", $this->description);
+        $stmt->bindParam(":image", $this->image);
+        $stmt->bindParam(":id", $this->id);
+        $stmt->bindParam(":user_id", $this->user_id);
+
+        return $stmt->execute();
+    }
+
+    /**
+     * Get a product by its ID and user ID.
+     *
+     * @param int $id Product ID.
+     * @param int $user_id User ID (to restrict access).
+     * @return array|false Associative array of product data or false if not found.
+     */
+    public function getById($id, $user_id) {
+        $query = "SELECT * FROM " . $this->table_name . " WHERE id = :id AND user_id = :user_id";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(":id", $id);
+        $stmt->bindParam(":user_id", $user_id);
+        $stmt->execute();
+
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Delete a product by its ID and user ID.
+     *
+     * @param int $id Product ID.
+     * @param int $user_id User ID.
+     * @return bool True on success, false on failure.
+     */
+    public function delete($id, $user_id) {
+        $query = "DELETE FROM " . $this->table_name . " WHERE id = :id AND user_id = :user_id";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(":id", $id);
+        $stmt->bindParam(":user_id", $user_id);
+
+        return $stmt->execute();
+    }
+
+    /**
+     * Get total count of products for a given user.
+     *
+     * @param int $user_id User ID.
+     * @return int Total products count.
+     */
+    public function getTotalCount($user_id) {
+        $query = "SELECT COUNT(*) AS total FROM " . $this->table_name . " WHERE user_id = :user_id";
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(":user_id", $user_id);
         $stmt->execute();
-        
+
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return isset($row['total']) ? (int)$row['total'] : 0;
+    }
+
+    /**
+     * Retrieve all products with optional search and category filter.
+     *
+     * @param int $user_id User ID.
+     * @param string $search Search term.
+     * @param string $category Category filter.
+     * @return PDOStatement PDO statement with results.
+     */
+    public function getAllWithFilters($user_id, $search = '', $category = '') {
+        $query = "SELECT * FROM " . $this->table_name . " WHERE user_id = :user_id";
+
+        if (!empty($search)) {
+            $query .= " AND (name LIKE :search OR description LIKE :search)";
+        }
+
+        if (!empty($category)) {
+            $query .= " AND category = :category";
+        }
+
+        $query .= " ORDER BY id DESC";
+
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(":user_id", $user_id);
+
+        if (!empty($search)) {
+            $searchParam = "%" . $search . "%";
+            $stmt->bindParam(":search", $searchParam);
+        }
+
+        if (!empty($category)) {
+            $stmt->bindParam(":category", $category);
+        }
+
+        $stmt->execute();
+        return $stmt;
+    }
+    // Get total number of low stock products for a user
+public function getLowStockCount($user_id) {
+    $query = "SELECT COUNT(*) AS total FROM " . $this->table_name . " WHERE user_id = :user_id AND quantity <= 5";
+    $stmt = $this->conn->prepare($query);
+    $stmt->bindParam(":user_id", $user_id);
+    $stmt->execute();
+
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    return isset($row['total']) ? (int)$row['total'] : 0;
+}
+
+
+    /**
+     * Get products with quantity less or equal to 5 (low stock).
+     *
+     * @param int $user_id User ID.
+     * @return PDOStatement
+     */
+    public function getLowStockProducts($user_id) {
+        $query = "SELECT * FROM " . $this->table_name . " WHERE user_id = :user_id AND quantity <= 5 ORDER BY quantity ASC";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(":user_id", $user_id);
+        $stmt->execute();
+
         return $stmt;
     }
 
-    // Read single product
-    public function readOne() {
-        $query = "SELECT * FROM " . $this->table_name . " 
-                  WHERE id = :id AND user_id = :user_id";
-        
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(":id", $this->id);
-        $stmt->bindParam(":user_id", $this->user_id);
-        $stmt->execute();
-        
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if($row) {
-            $this->name = $row['name'];
-            $this->description = $row['description'];
-            $this->quantity = $row['quantity'];
-            $this->price = $row['price'];
-            $this->category = $row['category'];
-            $this->created_at = $row['created_at'];
-            $this->updated_at = $row['updated_at'];
-            return true;
-        }
-        return false;
-    }
-
-    // Update product
-    public function update() {
-        $query = "UPDATE " . $this->table_name . " 
-                  SET name = :name, description = :description, 
-                      quantity = :quantity, price = :price, category = :category
-                  WHERE id = :id AND user_id = :user_id";
-        
-        $stmt = $this->conn->prepare($query);
-        
-        $stmt->bindParam(":name", $this->name);
-        $stmt->bindParam(":description", $this->description);
-        $stmt->bindParam(":quantity", $this->quantity);
-        $stmt->bindParam(":price", $this->price);
-        $stmt->bindParam(":category", $this->category);
-        $stmt->bindParam(":id", $this->id);
-        $stmt->bindParam(":user_id", $this->user_id);
-        
-        if($stmt->execute()) {
-            return true;
-        }
-        return false;
-    }
-
-    // Delete product
-    public function delete() {
-        $query = "DELETE FROM " . $this->table_name . " 
-                  WHERE id = :id AND user_id = :user_id";
-        
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(":id", $this->id);
-        $stmt->bindParam(":user_id", $this->user_id);
-        
-        if($stmt->execute()) {
-            return true;
-        }
-        return false;
-    }
-
-    // Get total products count
-    public function getTotalCount($user_id) {
-        $query = "SELECT COUNT(*) as total FROM " . $this->table_name . " 
-                  WHERE user_id = :user_id";
-        
+    /**
+     * Get all unique categories for a user.
+     *
+     * @param int $user_id User ID.
+     * @return PDOStatement
+     */
+    public function getAllCategories($user_id) {
+        $query = "SELECT DISTINCT category FROM " . $this->table_name . " WHERE user_id = :user_id ORDER BY category";
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(":user_id", $user_id);
         $stmt->execute();
-        
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $row['total'];
-    }
 
-    // Get low stock products (quantity < 10)
-    public function getLowStockCount($user_id) {
-        $query = "SELECT COUNT(*) as total FROM " . $this->table_name . " 
-                  WHERE user_id = :user_id AND quantity < 10";
-        
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(":user_id", $user_id);
-        $stmt->execute();
-        
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $row['total'];
-    }
-
-    // Get low stock products list
-    public function getLowStockProducts($user_id) {
-        $query = "SELECT * FROM " . $this->table_name . " 
-                  WHERE user_id = :user_id AND quantity < 10 
-                  ORDER BY quantity ASC";
-        
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(":user_id", $user_id);
-        $stmt->execute();
-        
         return $stmt;
     }
 }
