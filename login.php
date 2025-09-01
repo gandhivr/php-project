@@ -14,6 +14,10 @@ $user = new User($db);
 $error = '';
 
 // Check if form data was submitted via POST method
+  // The form was submitted, so you can now process the input data
+    // For example:
+    // $name = $_POST['name'];
+    // Validate inputs, save to database, etc.
 if ($_POST) {
     
     // Sanitize the username input to prevent XSS attacks and clean the data
